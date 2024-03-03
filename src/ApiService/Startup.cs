@@ -6,12 +6,10 @@ using ApiService.Contracts.UserApi;
 using ApiService.Models.Implementations;
 using ApiService.Models.Interfaces;
 using MassTransit;
-using MassTransit.PrometheusIntegration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using Prometheus;
 
@@ -88,8 +86,7 @@ namespace ApiService
 
                     config.UsePrometheusMetrics(serviceName: "api_service");
                 });
-            })
-            .AddMassTransitHostedService(true);
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

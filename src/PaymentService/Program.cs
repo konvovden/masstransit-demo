@@ -31,13 +31,13 @@ namespace PaymentService
                         c.AddConsumer<ReserveMoneyConsumer>(typeof(ReserveMoneyConsumerDefinition))
                             .Endpoint(configurator =>
                             {
-                                configurator.Name = endpointsConfig.PaymentServiceAddress;
+                                configurator.Name = endpointsConfig.PaymentServiceAddress!;
                             });
                         
                         c.AddConsumer<UnreserveMoneyConsumer>()
                             .Endpoint(configurator =>
                             {
-                                configurator.Name = endpointsConfig.PaymentServiceAddress;
+                                configurator.Name = endpointsConfig.PaymentServiceAddress!;
                             });
                         
                         c.UsingRabbitMq((context, configurator) =>
@@ -52,7 +52,6 @@ namespace PaymentService
                             configurator.ConfigureEndpoints(context);
                         });
                     });
-                    services.AddMassTransitHostedService(true);
                 });
     }
 }

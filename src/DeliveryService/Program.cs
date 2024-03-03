@@ -31,7 +31,7 @@ namespace DeliveryService
                         c.AddConsumer<DeliveryOrderConsumer>(typeof(DeliveryOrderConsumerDefinition))
                             .Endpoint(configurator =>
                             {
-                                configurator.Name = endpointsConfig.DeliveryServiceAddress;
+                                configurator.Name = endpointsConfig.DeliveryServiceAddress!;
                             });
 
                         c.AddDelayedMessageScheduler();
@@ -49,8 +49,6 @@ namespace DeliveryService
                             configurator.ConfigureEndpoints(context);
                         });
                     });
-
-                    services.AddMassTransitHostedService(true);
                 });
     }
 }

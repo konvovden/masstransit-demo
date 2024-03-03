@@ -4,7 +4,6 @@ using CartService.Contracts;
 using FeedbackService.Contracts;
 using HistoryService.Contracts;
 using MassTransit;
-using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,14 +64,15 @@ namespace OrderOrchestratorService
                         x.AddSagaStateMachine<OrderStateMachine, OrderState>(typeof(OrderStateMachineDefinition))
                             .Endpoint(e =>
                             {
-                                e.Name = endpointsConfig.OrderStateMachineAddress;
+                                e.Name = endpointsConfig.OrderStateMachineAddress!;
                             });
 
-                        x.AddSagaStateMachine<ArchivedOrderStateMachine, ArchivedOrderState>(typeof(ArchivedOrderStateMachineDefinition))
+                        x.AddSagaStateMachine<ArchivedOrderStateMachine, ArchivedOrderState>(
+                                typeof(ArchivedOrderStateMachineDefinition))
                             .InMemoryRepository()
                             .Endpoint(e =>
                             {
-                                e.Name = endpointsConfig.ArchiveOrderStateMachineAddress;
+                                e.Name = endpointsConfig.ArchiveOrderStateMachineAddress!;
                             });
 
                         x.AddDelayedMessageScheduler();
@@ -85,12 +85,12 @@ namespace OrderOrchestratorService
                         x.AddRequestClient<GetCart>(new Uri(endpointsConfig.CartServiceAddress!));
 
 
-                        x.UsingRabbitMq((context, cfg) => 
+                        x.UsingRabbitMq((context, cfg) =>
                         {
                             cfg.UseBsonSerializer();
 
                             cfg.UseDelayedMessageScheduler();
-                            
+
                             cfg.ConfigureEndpoints(context);
 
                             cfg.Host(rabbitMqConfig.Hostname, rabbitMqConfig.VirtualHost, h =>
@@ -100,7 +100,7 @@ namespace OrderOrchestratorService
                             });
                         });
 
-                    }).AddMassTransitHostedService(true);
+                    });
                 });
     }
 }

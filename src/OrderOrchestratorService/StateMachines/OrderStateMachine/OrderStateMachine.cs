@@ -2,8 +2,6 @@
 using System.Threading.Tasks;
 using ApiService.Contracts.ManagerApi;
 using ApiService.Contracts.UserApi;
-using Automatonymous;
-using Automatonymous.Binders;
 using CartService.Contracts;
 using DeliveryService.Contracts;
 using FeedbackService.Contracts;
@@ -125,7 +123,7 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
                 r.Timeout = TimeSpan.Zero;
             });
 
-            Schedule(() => FeedbackReceivingTimeout, instance => instance.FeedbackReceivingTimeoutToken, 
+            Schedule(() => FeedbackReceivingTimeout, Saga => Saga.FeedbackReceivingTimeoutToken, 
                 s =>
                 {
                     s.Delay = TimeSpan.FromMinutes(1);
@@ -138,13 +136,13 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(OrderAborted)
                 .Then(context =>
                 {
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order aborted. CorrelationId: {context.Instance.CorrelationId}");
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order aborted. CorrelationId: {context.Saga.CorrelationId}");
 
                     
                 })
                 .RespondAsync(x => x.Init<OrderAborted>(new
                 {
-                    OrderId = x.Instance.CorrelationId
+                    OrderId = x.Saga.CorrelationId
                 }))
                 .Finalize();
         }
@@ -154,10 +152,10 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(OrderSubmitted)
                 .Then(context =>
                 {
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order submitted. CorrelationId: {context.Instance.CorrelationId}");
-                    context.Instance.SubmitDate = DateTimeOffset.Now;
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order submitted. CorrelationId: {context.Saga.CorrelationId}");
+                    context.Saga.SubmitDate = DateTimeOffset.Now;
                 })
-                .Request(CartRequest, x => x.Init<GetCart>(new { OrderId = x.Instance.CorrelationId }))
+                .Request(CartRequest, x => x.Init<GetCart>(new { OrderId = x.Saga.CorrelationId }))
                 .TransitionTo(CartRequest.Pending);
         }
 
@@ -166,14 +164,14 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(CartRequest.Completed)
                 .Then(x  =>
                 {
-                    x.Instance.Cart = FromDtoCartPositionToDbConverter.ConvertMany(x.Data.CartContent, x.Instance.CorrelationId);
-                    x.Instance.TotalPrice = x.Data.TotalPrice;
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Cart returned. CorrelationId: {x.Instance.CorrelationId}");
+                    x.Saga.Cart = FromDtoCartPositionToDbConverter.ConvertMany(x.Message.CartContent, x.Saga.CorrelationId);
+                    x.Saga.TotalPrice = x.Message.TotalPrice;
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Cart returned. CorrelationId: {x.Saga.CorrelationId}");
                 })
                 .Request(MoneyReservationRequest, x => x.Init<ReserveMoney>(new
                 {
-                    OrderId = x.Data.OrderId,
-                    Amount = x.Data.TotalPrice
+                    OrderId = x.Message.OrderId,
+                    Amount = x.Message.TotalPrice
                 }))
                 .TransitionTo(MoneyReservationRequest.Pending);
         }
@@ -183,13 +181,13 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(MoneyReservationRequest.Completed)
                 .Then(x =>
                 {
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Money reserved. CorrelationId: {x.Instance.CorrelationId}");
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Money reserved. CorrelationId: {x.Saga.CorrelationId}");
                 })
                 .PublishAsync(x => x.Init<NewOrderConfirmationRequested>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Instance.Cart),
-                    TotalPrice = x.Instance.TotalPrice
+                    OrderId = x.Saga.CorrelationId,
+                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Saga.Cart),
+                    TotalPrice = x.Saga.TotalPrice
                 }))
                 .TransitionTo(AwaitingConfirmation);
         }
@@ -199,16 +197,16 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(OrderConfirmed)
                 .Then(x =>
                 {
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order confirmed. CorrelationId: {x.Instance.CorrelationId}");
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order confirmed. CorrelationId: {x.Saga.CorrelationId}");
 
-                    x.Instance.IsConfirmed = true;
-                    x.Instance.ConfirmationDate = DateTimeOffset.Now;
-                    x.Instance.Manager = x.Data.ConfirmManager;
+                    x.Saga.IsConfirmed = true;
+                    x.Saga.ConfirmationDate = DateTimeOffset.Now;
+                    x.Saga.Manager = x.Message.ConfirmManager;
                 })
                 .SendAsync(new Uri(_settings.DeliveryServiceAddress), x => x.Init<DeliveryOrder>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Instance.Cart)
+                    OrderId = x.Saga.CorrelationId,
+                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Saga.Cart)
                 }))
                 .TransitionTo(AwaitingDelivery);
         }
@@ -218,19 +216,19 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(OrderRejected)
                 .Then(x =>
                 {
-                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order rejected. CorrelationId: {x.Instance.CorrelationId}");
+                    _logger.LogInformation($"[{DateTime.Now}][SAGA] Order rejected. CorrelationId: {x.Saga.CorrelationId}");
 
-                    x.Instance.Manager = x.Data.RejectManager;
+                    x.Saga.Manager = x.Message.RejectManager;
                 })
                 .PublishAsync(x => x.Init<OrderRejected>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Reason = x.Data.Reason
+                    OrderId = x.Saga.CorrelationId,
+                    Reason = x.Message.Reason
                 }))
                 .Request(MoneyUnreservationRequest, x => x.Init<UnreserveMoney>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Amount = x.Instance.TotalPrice
+                    OrderId = x.Saga.CorrelationId,
+                    Amount = x.Saga.TotalPrice
                 }))
                 .TransitionTo(MoneyUnreservationRequest.Pending);
         }
@@ -240,15 +238,15 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(OrderDelivered)
                 .Then(x =>
                 {
-                    x.Instance.DeliveryDate = DateTimeOffset.Now;
+                    x.Saga.DeliveryDate = DateTimeOffset.Now;
                 })
                 .PublishAsync(x => x.Init<FeedbackRequested>(new
                 {
-                    OrderId = x.Instance.CorrelationId
+                    OrderId = x.Saga.CorrelationId
                 }))
                 .Schedule(FeedbackReceivingTimeout, x => x.Init<FeedbackReceivingTimeoutExpired>(new
                 {
-                    OrderId = x.Instance.CorrelationId
+                    OrderId = x.Saga.CorrelationId
                 }))
                 .TransitionTo(AwaitingFeedback);
         }
@@ -259,9 +257,9 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
                 .Unschedule(FeedbackReceivingTimeout)
                 .Request(AddFeedbackRequest, x => x.Init<AddFeedback>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Text = x.Data.Text,
-                    StarsAmount = x.Data.StarsAmount
+                    OrderId = x.Saga.CorrelationId,
+                    Text = x.Message.Text,
+                    StarsAmount = x.Message.StarsAmount
                 }))
                 .TransitionTo(AddFeedbackRequest.Pending);
         }
@@ -270,17 +268,17 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
         {
             return When(FeedbackReceivingTimeout.Received)
                 .Then(x => _logger.LogInformation(
-                    $"[{DateTime.Now}][SAGA] Feedback receiving timed out. CorrelationId: {x.Instance.CorrelationId}"))
+                    $"[{DateTime.Now}][SAGA] Feedback receiving timed out. CorrelationId: {x.Saga.CorrelationId}"))
                 .Request(ArchiveOrderRequest, x => x.Init<ArchiveOrder>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Instance.Cart),
-                    TotalPrice = x.Instance.TotalPrice,
-                    IsConfirmed = x.Instance.IsConfirmed,
-                    SubmitDate = x.Instance.SubmitDate,
-                    Manager = x.Instance.Manager,
-                    ConfirmDate = x.Instance.ConfirmationDate,
-                    DeliveredDate = x.Instance.DeliveryDate
+                    OrderId = x.Saga.CorrelationId,
+                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Saga.Cart),
+                    TotalPrice = x.Saga.TotalPrice,
+                    IsConfirmed = x.Saga.IsConfirmed,
+                    SubmitDate = x.Saga.SubmitDate,
+                    Manager = x.Saga.Manager,
+                    ConfirmDate = x.Saga.ConfirmationDate,
+                    DeliveredDate = x.Saga.DeliveryDate
                 }))
                 .TransitionTo(ArchiveOrderRequest.Pending);
         }
@@ -290,14 +288,14 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
             return When(AddFeedbackRequest.Completed)
                 .Request(ArchiveOrderRequest, x => x.Init<ArchiveOrder>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Instance.Cart),
-                    TotalPrice = x.Instance.TotalPrice,
-                    IsConfirmed = x.Instance.IsConfirmed,
-                    SubmitDate = x.Instance.SubmitDate,
-                    Manager = x.Instance.Manager,
-                    ConfirmDate = x.Instance.ConfirmationDate,
-                    DeliveredDate = x.Instance.DeliveryDate
+                    OrderId = x.Saga.CorrelationId,
+                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Saga.Cart),
+                    TotalPrice = x.Saga.TotalPrice,
+                    IsConfirmed = x.Saga.IsConfirmed,
+                    SubmitDate = x.Saga.SubmitDate,
+                    Manager = x.Saga.Manager,
+                    ConfirmDate = x.Saga.ConfirmationDate,
+                    DeliveredDate = x.Saga.DeliveryDate
                 }))
                 .TransitionTo(ArchiveOrderRequest.Pending);
         }
@@ -305,7 +303,7 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
         private EventActivities<OrderState> WhenOrderArchived()
         {
             return When(ArchiveOrderRequest.Completed)
-                .Then(x => _logger.LogInformation($"[{DateTime.Now}][SAGA] Order archived. CorrelationId: {x.Instance.CorrelationId}"))
+                .Then(x => _logger.LogInformation($"[{DateTime.Now}][SAGA] Order archived. CorrelationId: {x.Saga.CorrelationId}"))
                 .Finalize();
         }
 
@@ -313,17 +311,17 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
         {
             return When(MoneyUnreservationRequest.Completed)
                 .Then(x => _logger.LogInformation(
-                    $"[{DateTime.Now}][SAGA] Money unreserved. CorrelationId: {x.Instance.CorrelationId}"))
+                    $"[{DateTime.Now}][SAGA] Money unreserved. CorrelationId: {x.Saga.CorrelationId}"))
                 .Request(ArchiveOrderRequest, x => x.Init<ArchiveOrder>(new
                 {
-                    OrderId = x.Instance.CorrelationId,
-                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Instance.Cart),
-                    TotalPrice = x.Instance.TotalPrice,
-                    IsConfirmed = x.Instance.IsConfirmed,
-                    SubmitDate = x.Instance.SubmitDate,
-                    Manager = x.Instance.Manager,
-                    ConfirmDate = x.Instance.ConfirmationDate,
-                    DeliveredDate = x.Instance.DeliveryDate
+                    OrderId = x.Saga.CorrelationId,
+                    Cart = FromDtoCartPositionToDbConverter.ConvertBackMany(x.Saga.Cart),
+                    TotalPrice = x.Saga.TotalPrice,
+                    IsConfirmed = x.Saga.IsConfirmed,
+                    SubmitDate = x.Saga.SubmitDate,
+                    Manager = x.Saga.Manager,
+                    ConfirmDate = x.Saga.ConfirmationDate,
+                    DeliveredDate = x.Saga.DeliveryDate
                 }))
                 .TransitionTo(ArchiveOrderRequest.Pending);
         }
@@ -332,14 +330,14 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
         {
             return When(MoneyReservationRequest.TimeoutExpired)
                 .Then(x => _logger.LogWarning(
-                    $"[{DateTime.Now}][SAGA] MoneyReservation request timed out. CorrelationId: {x.Instance.CorrelationId}"));
+                    $"[{DateTime.Now}][SAGA] MoneyReservation request timed out. CorrelationId: {x.Saga.CorrelationId}"));
         }
 
         private EventActivities<OrderState> WhenMoneyReservationRequestFaulted()
         {
             return When(MoneyReservationRequest.Faulted)
                 .Then(x => _logger.LogError(
-                    $"[{DateTime.Now}][SAGA] MoneyReservation request failed. CorrelationId: {x.Instance.CorrelationId}"));
+                    $"[{DateTime.Now}][SAGA] MoneyReservation request failed. CorrelationId: {x.Saga.CorrelationId}"));
         }
     }
 #nullable restore

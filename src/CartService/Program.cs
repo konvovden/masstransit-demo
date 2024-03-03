@@ -54,19 +54,19 @@ namespace CartService
                         x.AddConsumer<AddCartPositionConsumer>(typeof(AddCartPositionConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.CartServiceAddress;
+                                cfg.Name = endpointsConfig.CartServiceAddress!;
                             });
 
                         x.AddConsumer<RemoveCartPositionConsumer>(typeof(RemoveCartPositionConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.CartServiceAddress;
+                                cfg.Name = endpointsConfig.CartServiceAddress!;
                             });
 
                         x.AddConsumer<GetCartConsumer>(typeof(GetCartConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.CartServiceAddress;
+                                cfg.Name = endpointsConfig.CartServiceAddress!;
                             });
 
                         x.UsingRabbitMq((context, cfg) =>
@@ -81,7 +81,7 @@ namespace CartService
                             });
                         });
 
-                    }).AddMassTransitHostedService(true);
+                    });
                 });
 
     }

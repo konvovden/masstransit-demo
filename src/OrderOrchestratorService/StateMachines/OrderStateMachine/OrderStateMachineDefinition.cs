@@ -1,6 +1,4 @@
-﻿using GreenPipes;
-using MassTransit;
-using MassTransit.Definition;
+﻿using MassTransit;
 
 namespace OrderOrchestratorService.StateMachines.OrderStateMachine
 {
@@ -13,10 +11,11 @@ namespace OrderOrchestratorService.StateMachines.OrderStateMachine
         }
 
         protected override void ConfigureSaga(IReceiveEndpointConfigurator endpointConfigurator,
-            ISagaConfigurator<OrderState> sagaConfigurator)
+            ISagaConfigurator<OrderState> sagaConfigurator,
+            IRegistrationContext context)
         {
             endpointConfigurator.UseMessageRetry(r => r.Intervals(50, 100, 500, 1000));
-            endpointConfigurator.UseInMemoryOutbox();
+            endpointConfigurator.UseInMemoryOutbox(context);
         }
     }
 }

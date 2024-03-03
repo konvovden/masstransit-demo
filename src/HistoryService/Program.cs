@@ -9,10 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 
 namespace HistoryService
 {
@@ -57,13 +54,13 @@ namespace HistoryService
                         x.AddConsumer<ArchivedOrderConsumer>(typeof(ArchivedOrderConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.HistoryServiceAddress;
+                                cfg.Name = endpointsConfig.HistoryServiceAddress!;
                             });
 
                         x.AddConsumer<GetOrderFromArchiveConsumer>(typeof(GetOrderFromArchiveConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.HistoryServiceAddress;
+                                cfg.Name = endpointsConfig.HistoryServiceAddress!;
                             });
 
                         x.UsingRabbitMq((context, cfg) =>
@@ -78,7 +75,7 @@ namespace HistoryService
                             });
                         });
 
-                    }).AddMassTransitHostedService(true);
+                    });
                 });
     }
 }

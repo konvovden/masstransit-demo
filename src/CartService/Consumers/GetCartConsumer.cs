@@ -1,8 +1,6 @@
-﻿using CartService.Database.Models;
-using CartService.Database.Repositories.Interfaces;
+﻿using CartService.Database.Repositories.Interfaces;
 using MassTransit;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;

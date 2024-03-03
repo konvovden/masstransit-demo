@@ -9,10 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 
 namespace FeedbackService
 {
@@ -55,13 +52,13 @@ namespace FeedbackService
                         x.AddConsumer<AddFeedbackConsumer>(typeof(AddFeedbackConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.FeedbackServiceAddress;
+                                cfg.Name = endpointsConfig.FeedbackServiceAddress!;
                             });
 
                         x.AddConsumer<GetOrderFeedbackConsumer>(typeof(GetOrderFeedbackConsumerDefinition))
                             .Endpoint(cfg =>
                             {
-                                cfg.Name = endpointsConfig.FeedbackServiceAddress;
+                                cfg.Name = endpointsConfig.FeedbackServiceAddress!;
                             });
 
                         x.UsingRabbitMq((context, cfg) =>
@@ -76,7 +73,7 @@ namespace FeedbackService
                             });
                         });
 
-                    }).AddMassTransitHostedService(true);
+                    });
                 });
     }
 }

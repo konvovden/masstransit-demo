@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using ApiService.Contracts.ManagerApi;
 using ApiService.Contracts.UserApi;
-using Automatonymous.Graphing;
 using Automatonymous.Visualizer;
 using CartService.Contracts;
 using DeliveryService.Contracts;
